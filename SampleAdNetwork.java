@@ -314,10 +314,10 @@ public class SampleAdNetwork extends Agent {
 				+ ". UCS Level set to " + notificationMessage.getServiceLevel()
 				+ " at price " + notificationMessage.getPrice()
 				+ " Quality Score is: " + notificationMessage.getQualityScore());
-                if(day>58){
-                    AdNetBidMessage bids = new AdNetBidMessage(0.1 + new Random().nextDouble()/10.0, pendingCampaign.id, (long)100);
-                    sendMessage(demandAgentAddress, bids);
-                }
+//                if(day>58){
+//                    AdNetBidMessage bids = new AdNetBidMessage(0.1 + new Random().nextDouble()/10.0, pendingCampaign.id, (long)100);
+//                    sendMessage(demandAgentAddress, bids);
+//                }
 	}
 
 	/**
