@@ -1,6 +1,6 @@
 package ia;
 
-//thist is 
+//thist
 
 //hangg
 //haha
