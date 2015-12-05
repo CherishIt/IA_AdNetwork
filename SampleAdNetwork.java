@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -271,7 +272,7 @@ public class SampleAdNetwork extends Agent {
 		Random random = new Random();
 		long cmpimps = com.getReachImps();
 		long cmpBidMillis = random.nextInt((int)cmpimps);
-
+		
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
 
                 
@@ -291,7 +292,7 @@ public class SampleAdNetwork extends Agent {
 		}
 
 		/* Note: Campaign bid is in millis */
-		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, cmpBidMillis);
+		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.11*cmpimps));
 		sendMessage(demandAgentAddress, bids);
 	}
 
@@ -366,7 +367,7 @@ public class SampleAdNetwork extends Agent {
 		 * revenue per imp
 		 */
 
-		double rbid = 10000.0;
+		//double maxBid = 10000.0;
 
 		/*
 		 * add bid entries w.r.t. each active campaign with remaining contracted
@@ -375,10 +376,53 @@ public class SampleAdNetwork extends Agent {
 		 * for now, a single entry per active campaign is added for queries of
 		 * matching target segment.
 		 */
-
-		if ((dayBiddingFor >= currCampaign.dayStart)
-				&& (dayBiddingFor <= currCampaign.dayEnd)
-				&& (currCampaign.impsTogo() > 0)) {
+		
+		
+		//Bid for all my active campaigns
+		Iterator it = myCampaigns.entrySet().iterator();
+		while(it.hasNext()){
+			Map.Entry entry = (Map.Entry)it.next();
+			CampaignData campaign = (CampaignData)entry.getValue();
+			//active campaign
+			if((dayBiddingFor >= campaign.dayStart)
+					&& (dayBiddingFor <= campaign.dayEnd)){
+				for(AdxQuery query : campaign.campaignQueries) {
+					// maxBid not exceed budget per imp
+					double maxBid = 1000 * campaign.budget/campaign.reachImps;
+					// default coef = 1 (text, pc)
+					double coef = 1;
+					// if is mobile or video, add 0.6 of corresponding coef
+					if(query.getDevice() == Device.mobile)
+						coef = 1 + (campaign.mobileCoef-1)*0.6;
+					if(query.getAdType() == AdType.video)
+						coef = 1 + (campaign.videoCoef-1)*0.6;
+					// have competition, bid 0.5*max*coef
+					// ?? leave weight here for future.
+					if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
+						//if(dayBiddingFor == )
+						bidBundle.addQuery(query, maxBid*coef*0.5, new Ad(null),
+								campaign.id, 1);
+					} 
+					// no competitor
+					else {
+						double bid = maxBid*coef;
+						if(campaign.impsTogo() > 0)
+							bid *= 1;
+						else
+							bid *= 1;
+						bidBundle.addQuery(query, bid, new Ad(null), campaign.id, 1);
+					}
+				}
+			}
+		}
+		
+		if (bidBundle != null) {
+			System.out.println("[sendBidAndAds] Day " + day + ": Sending BidBundle");
+			sendMessage(adxAgentAddress, bidBundle);
+		}
+		
+		/*if ((dayBiddingFor >= currCampaign.dayStart)
+				&& (dayBiddingFor <= currCampaign.dayEnd)) {
 
 			int entCount = 0;
 
@@ -389,7 +433,7 @@ public class SampleAdNetwork extends Agent {
 					 * randomly chooses an entry according to the designated
 					 * weight. by setting a constant weight 1, we create a
 					 * uniform probability over active campaigns(irrelevant because we are bidding only on one campaign)
-					 */
+					 *
 					if (query.getDevice() == Device.pc) {
 						if (query.getAdType() == AdType.text) {
 							entCount++;
@@ -417,12 +461,9 @@ public class SampleAdNetwork extends Agent {
 
 			System.out.println("[sendBidAndAds] Day " + day + ": Updated " + entCount
 					+ " Bid Bundle entries for Campaign id " + currCampaign.id);
-		}
+		}*/
 
-		if (bidBundle != null) {
-			System.out.println("[sendBidAndAds] Day " + day + ": Sending BidBundle");
-			sendMessage(adxAgentAddress, bidBundle);
-		}
+		
 	}
 
 	/**
@@ -579,14 +620,16 @@ public class SampleAdNetwork extends Agent {
 	private void genCampaignQueries(CampaignData campaignData) {
 		Set<AdxQuery> campaignQueriesSet = new HashSet<AdxQuery>();
 		for (String PublisherName : publisherNames) {
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.mobile, AdType.text));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.mobile, AdType.video));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.pc, AdType.text));
-			campaignQueriesSet.add(new AdxQuery(PublisherName,
-					campaignData.targetSegment, Device.pc, AdType.video));
+			for (Set<MarketSegment> subSegment : campaignData.subTargetSegment){
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+					subSegment, Device.mobile, AdType.text));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+					subSegment, Device.mobile, AdType.video));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+					subSegment, Device.pc, AdType.text));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+					subSegment, Device.pc, AdType.video));
+			}
 		}
 
 		campaignData.campaignQueries = new AdxQuery[campaignQueriesSet.size()];
@@ -658,6 +701,25 @@ public class SampleAdNetwork extends Agent {
             return 0.0;
         }
         
+
+    private boolean haveCompetitor(Set<MarketSegment> seg, int day){
+    	if(day <= 5) {
+    		System.out.println("[haveCompetitor] (day: " + day + ")" + "(segment:" + seg + ") false : First 5 days, cannot judge.");
+    		return true;
+    	}
+    	for (CampaignData d: allCampaign){
+    		// active campaign && not my campaign && contain this segment ---> competitor
+            if((d.dayStart <= day && d.dayEnd >= day) &&
+                (!myCampaigns.containsKey(d.id)) &&
+                (d.subTargetSegment.contains(seg))) {
+            	System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ") true :" + d);
+            	return true;
+            }   
+        }
+    	System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ")" + "false");
+    	return false;
+    }
+
 	private class CampaignData {
 		/* campaign attributes as set by server */
 		Long reachImps;
@@ -764,8 +826,11 @@ public class SampleAdNetwork extends Agent {
 				String[] names = segNames.split(",");
 				Boolean isSub = true;
 				for(String name : names) {
-					if(!MarketSegment.names(MarketSegment.marketSegments().get(i)).contains(name))
+					if(!MarketSegment.names(MarketSegment.marketSegments().get(i)).contains(name)){
 						isSub = false;
+					}else if(name == "MALE" && MarketSegment.names(MarketSegment.marketSegments().get(i)).contains("FEMALE")){
+						isSub = false;
+					}
 				}
 				if(isSub)
 					this.subTargetSegment.add(MarketSegment.marketSegments().get(i));
