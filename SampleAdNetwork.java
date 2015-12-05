@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
@@ -74,8 +75,10 @@ public class SampleAdNetwork extends Agent {
 	private PublisherCatalog publisherCatalog;
 	private InitialCampaignMessage initialCampaignMessage;
 	private AdNetworkDailyNotification adNetworkDailyNotification;
-        
-        private final Queue<CampaignData> allCampaign;
+	
+    private final Queue<CampaignData> allCampaign;
+    
+    
 	/*
 	 * The addresses of server entities to which the agent should send the daily
 	 * bids data
@@ -121,6 +124,12 @@ public class SampleAdNetwork extends Agent {
 	private int day;
 	private String[] publisherNames;
 	private CampaignData currCampaign;
+	
+	private void computeUcsTargetLevel () {
+		
+	}
+	
+	
 
 	public SampleAdNetwork() {
 		campaignReports = new LinkedList<CampaignReport>();
@@ -596,6 +605,7 @@ public class SampleAdNetwork extends Agent {
 		long dayStart;
 		long dayEnd;
 		Set<MarketSegment> targetSegment;
+		List<Set<MarketSegment>> subTargetSegment = new ArrayList<Set<MarketSegment>>();
 		double videoCoef;
 		double mobileCoef;
 		int id;
@@ -613,9 +623,94 @@ public class SampleAdNetwork extends Agent {
 			videoCoef = icm.getVideoCoef();
 			mobileCoef = icm.getMobileCoef();
 			id = icm.getId();
-
+			
+			
+			// if seg is 1 or 2, get all 3 subSeg
+			this.addSubTargetSeg(targetSegment);
+			
 			stats = new CampaignStats(0, 0, 0);
 			budget = 0.0;
+		}
+		
+		private void addSubTargetSeg(Set<MarketSegment> tar){
+			for(int i = 0; i < 17; i ++) {
+				Set<MarketSegment> seg = MarketSegment.marketSegments().get(i);
+				if(!(tar.size() == seg.size() && tar.containsAll(seg)))
+					continue;
+				switch(i){
+				case 0:
+					this.addSubTargetSeg("FEMALE");
+					break;
+				case 1:
+					this.addSubTargetSeg("MALE");
+					break;
+				case 2:
+					this.addSubTargetSeg("YOUNG");
+					break;
+				case 3:
+					this.addSubTargetSeg("OLD");
+					break;
+				case 4:
+					this.addSubTargetSeg("LOW_INCOME");
+					break;
+				case 5:
+					this.addSubTargetSeg("HIGH_INCOME");
+					break;
+				case 6:
+					this.addSubTargetSeg("FEMALE,YOUNG");
+					break;
+				case 7:
+					this.addSubTargetSeg("FEMALE,OLD");
+					break;
+				case 8:
+					this.addSubTargetSeg("MALE,YOUNG");
+					break;
+				case 9:
+					this.addSubTargetSeg("MALE,OLD");
+					break;
+				case 10:
+					this.addSubTargetSeg("FEMALE,LOW_INCOME");
+					break;
+				case 11:
+					this.addSubTargetSeg("FEMALE,HIGH_INCOME");
+					break;
+				case 12:
+					this.addSubTargetSeg("MALE,LOW_INCOME");
+					break;
+				case 13:
+					this.addSubTargetSeg("MALE,HIGH_INCOME");
+					break;
+				case 14:
+					this.addSubTargetSeg("YOUNG,LOW_INCOME");
+					break;
+				case 15:
+					this.addSubTargetSeg("YOUNG,HIGH_INCOME");
+					break;
+				case 16:
+					this.addSubTargetSeg("OLD,LOW_INCOME");
+					break;
+				case 17:
+					this.addSubTargetSeg("OLD,HIGH_INCOME");
+					break;
+				}
+			}
+			System.out.println("subTargetSegments::::!!");
+			for(Set<MarketSegment> seg : this.subTargetSegment){
+				System.out.println(MarketSegment.names(seg));
+			}
+		}
+		
+		private void addSubTargetSeg(String segNames){
+			for(int i=18; i<26; i++){
+				String[] names = segNames.split(",");
+				Boolean isSub = true;
+				for(String name : names) {
+					if(!MarketSegment.names(MarketSegment.marketSegments().get(i)).contains(name))
+						isSub = false;
+				}
+				if(isSub)
+					this.subTargetSegment.add(MarketSegment.marketSegments().get(i));
+			} 
 		}
 
 		public void setBudget(double d) {
@@ -632,6 +727,9 @@ public class SampleAdNetwork extends Agent {
 			videoCoef = com.getVideoCoef();
 			stats = new CampaignStats(0, 0, 0);
 			budget = 0.0;
+			
+			// if seg is 1 or 2, get all 3 subSeg
+			this.addSubTargetSeg(targetSegment);
 		}
 
 		@Override
