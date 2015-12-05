@@ -124,6 +124,9 @@ public class SampleAdNetwork extends Agent {
 	private int day;
 	private String[] publisherNames;
 	private CampaignData currCampaign;
+        
+        private double midPrice;
+        private double maxPrice;
 	
 	private void computeUcsTargetLevel () {
 		
@@ -271,6 +274,9 @@ public class SampleAdNetwork extends Agent {
 
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
 
+                
+                getDayOtherCampaign(day);
+                getDayMyCampaign(day);
 		/*
 		 * Adjust ucs bid s.t. target level is achieved. Note: The bid for the
 		 * user classification service is piggybacked
@@ -599,20 +605,59 @@ public class SampleAdNetwork extends Agent {
         
         }
         
-        private Queue<CampaignData> getDayCampaign(int _day){
-            Queue<CampaignData> dayCampaign;
-            dayCampaign = new LinkedList<CampaignData>();
+        private Queue<CampaignData> getDayOtherCampaign(int _day){
+            Queue<CampaignData> dayOtherCampaign;
+            dayOtherCampaign = new LinkedList<CampaignData>();
             
             for (CampaignData d: allCampaign){
-                if(d.dayStart <= _day && d.dayEnd >= _day){
-                    dayCampaign.add(d);
-                    System.out.println("    [getDayCampaign] (day: " + _day +") " + d);
+                if(d.dayStart <= _day && d.dayEnd >= _day && myCampaigns.get(d.id) == null){
+                    dayOtherCampaign.add(d);
+                    System.out.println("    [getDayOtherCampaign] (day: " + _day +") " + d);
                 }   
             }
             
-            return dayCampaign;
+            return dayOtherCampaign;
+        }
+        
+        private Queue<CampaignData> getDayMyCampaign(int _day){
+            Queue<CampaignData> dayMyCampaign;
+            dayMyCampaign = new LinkedList<CampaignData>();
+            
+            for(CampaignData camp : myCampaigns.values()){
+                if(camp.dayStart <= _day && camp.dayEnd >= _day){
+                    dayMyCampaign.add(camp);
+                    System.out.println("    [getDayMyCampaign] (day: " + _day +") " + camp);
+                }
+            }
+            
+            return dayMyCampaign;
         }
 
+        private void setMidPrice(double ucsPrice, double ucsLevel){
+            if(midPrice == ucsPrice && ucsLevel < 0.48){midPrice = midPrice*2;}
+            if(midPrice == ucsPrice && ucsLevel >= 0.48 && ucsLevel < 0.53){midPrice = midPrice*1.1;}
+            if(midPrice == ucsPrice && ucsLevel >= 0.53 && ucsLevel < 0.73){midPrice = midPrice;}
+            if(midPrice == ucsPrice && ucsLevel >= 0.73 && ucsLevel < 1){midPrice = midPrice*0.9;}
+            if(midPrice == ucsPrice && ucsLevel ==1){midPrice = midPrice*0.5;}
+            System.out.println("    [setMidPrice] Day: "+ day +" MidPrice = " + midPrice);
+         
+        }
+        
+        private double getUCSbid(double ucsDemandLevel){
+            double _ucsBid = 0.0;
+            
+            if (ucsDemandLevel<0.4){_ucsBid = maxPrice>0.0005?0.0005:maxPrice;}
+            if (ucsDemandLevel>=0.4 && ucsDemandLevel<=0.7){_ucsBid = maxPrice>midPrice?midPrice:maxPrice;}
+            if (ucsDemandLevel>0.7){_ucsBid = maxPrice;}
+
+            return _ucsBid;
+        }
+        
+        private double getUCSDemandlevel(){
+            
+            return 0.0;
+        }
+        
 	private class CampaignData {
 		/* campaign attributes as set by server */
 		Long reachImps;
