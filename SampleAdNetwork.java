@@ -598,6 +598,20 @@ public class SampleAdNetwork extends Agent {
             }
         
         }
+        
+        private Queue<CampaignData> getDayCampaign(int _day){
+            Queue<CampaignData> dayCampaign;
+            dayCampaign = new LinkedList<CampaignData>();
+            
+            for (CampaignData d: allCampaign){
+                if(d.dayStart <= _day && d.dayEnd >= _day){
+                    dayCampaign.add(d);
+                    System.out.println("    [getDayCampaign] (day: " + _day +") " + d);
+                }   
+            }
+            
+            return dayCampaign;
+        }
 
 	private class CampaignData {
 		/* campaign attributes as set by server */
