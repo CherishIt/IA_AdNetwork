@@ -886,7 +886,7 @@ public class SampleAdNetwork extends Agent {
 		}
 		
 		private void addSubTargetSeg(Set<MarketSegment> tar){
-			for(int i = 0; i < 17; i ++) {
+			for(int i = 0; i < 26; i ++) {
 				Set<MarketSegment> seg = MarketSegment.marketSegments().get(i);
 				if(!(tar.size() == seg.size() && tar.containsAll(seg)))
 					continue;
