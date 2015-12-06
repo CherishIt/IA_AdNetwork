@@ -405,9 +405,17 @@ public class SampleAdNetwork extends Agent {
 						coef = 1 + (campaign.mobileCoef-1)*0.9;
 					if(query.getAdType() == AdType.video)
 						coef = 1 + (campaign.videoCoef-1)*0.9;
+					
+					//is unknown user
+					if(query.getMarketSegments().size() ==0){
+						String publisher = query.getPublisher();
+						double ratio = this.getCampaignPopRatio(campaign);
+						bidBundle.addQuery(query, maxBid*coef*0.8*ratio*ratio, new Ad(null),
+								campaign.id, 1);
+					}
 					// have competition, bid 0.5*max*coef
 					// ?? leave weight here for future.
-					if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
+					else if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
 						//if(dayBiddingFor == )
 						
 						bidBundle.addQuery(query, maxBid*coef*0.8, new Ad(null),
@@ -641,7 +649,19 @@ public class SampleAdNetwork extends Agent {
 					subSegment, Device.pc, AdType.text));
 				campaignQueriesSet.add(new AdxQuery(PublisherName,
 					subSegment, Device.pc, AdType.video));
+				//add unknown segment
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+						new HashSet<MarketSegment>(), Device.mobile,
+						AdType.video));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+						new HashSet<MarketSegment>(), Device.mobile,
+						AdType.text));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+						new HashSet<MarketSegment>(), Device.pc, AdType.video));
+				campaignQueriesSet.add(new AdxQuery(PublisherName,
+						new HashSet<MarketSegment>(), Device.pc, AdType.text));
 			}
+			
 		}
 
 		campaignData.campaignQueries = new AdxQuery[campaignQueriesSet.size()];
@@ -713,7 +733,7 @@ public class SampleAdNetwork extends Agent {
             return 0.0;
         }
         
-
+    // Judge whether Others have campaign on a subSegment
     private boolean haveCompetitor(Set<MarketSegment> seg, int day){
     	if(day <= 5) {
     		System.out.println("[haveCompetitor] (day: " + day + ")" + "(segment:" + seg + ") false : First 5 days, cannot judge.");
@@ -732,12 +752,58 @@ public class SampleAdNetwork extends Agent {
     	return false;
     }
     
-    private double getSegmentWinRatio(AdxQuery query, int day){
-    	AdNetworkReport adReport = adNetworkReports.get(day);
+    //Get how much Campaign I have on a subSegment
+    private int numMyCampOnSeg(Set<MarketSegment> seg, int day) {
+    	int num = 0;
+    	for(CampaignData d : myCampaigns.values()){
+    		if((d.dayStart <= day && d.dayEnd >= day) &&
+	                (d.subTargetSegment.contains(seg))) {
+	            num++;
+	        }
+    	}
+    	System.out.println("[numMyCampaign] (day: " + day +") " + "(segment:" + seg + "):" + num);
+        return num;
+    }
+    
+    // Get competitionRatio for a Campaign (weighted average of all subSegs)
+    private double competitionRatio(CampaignData camp, int day) {
+    	double ratio = 1;
+    	double total = MarketSegment.marketSegmentSize(camp.targetSegment);
+    	double competeTotal = 0;
+    	for(Set<MarketSegment> subseg : camp.subTargetSegment){
+    		int subTotal = MarketSegment.marketSegmentSize(subseg);
+    		// other competitor -> competitor
+    		if(haveCompetitor(subseg, day)){
+    			competeTotal += subTotal;
+    		} else {
+    			int numMy = numMyCampOnSeg(subseg, day);
+    			// my other camp -> not fully compete.
+    			if(numMy > 0){
+    				competeTotal += subTotal - subTotal/numMy;
+    			}
+    		}
+    	}
+    	return competeTotal/total;
+    }
+    
+    private double getSegmentPopRatio(Set<MarketSegment> seg){
+    	double segPop = MarketSegment.marketSegmentSize(seg);
+    	double allPop = MarketSegment.marketSegmentSize(MarketSegment.compundMarketSegment1(MarketSegment.MALE))
+    			+ MarketSegment.marketSegmentSize(MarketSegment.compundMarketSegment1(MarketSegment.FEMALE));
+
+    	double ratio = segPop/allPop;
+    	System.out.println("[getSegmentPopRatio] (totalPop: " + allPop 
+    			+ ") (segPop: " + segPop + ") ( ratio: "+ ratio  );
     	
-    	//for(adReport.)
-    	
-    	return 1.0;
+    	return ratio;
+    }
+    
+    private double getCampaignPopRatio(CampaignData camp){
+    	double ratio = 0;
+    	for(Set<MarketSegment> subseg : camp.subTargetSegment){
+    		ratio += getSegmentPopRatio(subseg);
+    	}
+    	return ratio;
     }
     
     private double getDayUcsLevel(int day) {
@@ -750,6 +816,40 @@ public class SampleAdNetwork extends Agent {
     	double quality = notifications.get(day).getQualityScore();
     	System.out.println("[getDayQuality][day:" + day +"]" + quality);
     	return quality;
+    }
+  
+    private static Double getPublisherPop(String publisher){
+    	Map<String, Double> pubPop =  new HashMap();
+    	pubPop.put("yahoo", 16.0);
+    	pubPop.put("cnn", 2.2);
+    	pubPop.put("nyt", 3.1);
+    	pubPop.put("hfngtn", 8.1);
+    	pubPop.put("msn", 18.2);
+    	pubPop.put("fox", 3.1);
+    	pubPop.put("amazon", 12.8);
+    	pubPop.put("ebay", 8.5);
+    	pubPop.put("wallmart", 3.8);
+    	pubPop.put("target", 2.0);
+    	pubPop.put("bestbuy", 1.6);
+    	pubPop.put("sears", 1.6);
+    	pubPop.put("webmd", 2.5);
+    	pubPop.put("ehow", 2.5);
+    	pubPop.put("ask", 5.0);
+    	pubPop.put("tripadvisor", 1.6);
+    	pubPop.put("cnet", 1.7);
+    	pubPop.put("wheather", 5.8);
+    	return pubPop.get(publisher);
+    }
+    
+    private double getPublisherPopRatio(String publisher) {
+    	if(null == this.publisherNames){
+    		this.getPublishersNames();
+    	}
+    	double total = 0;
+    	for(String pubName : publisherNames){
+    		total += getPublisherPop(pubName);
+    	}
+    	return getPublisherPop(publisher)/total;
     }
 
 	private class CampaignData {
@@ -845,6 +945,8 @@ public class SampleAdNetwork extends Agent {
 				case 17:
 					this.addSubTargetSeg("OLD,HIGH_INCOME");
 					break;
+				default:
+					this.subTargetSegment.add(targetSegment);
 				}
 			}
 			System.out.println("subTargetSegments::::!!");
