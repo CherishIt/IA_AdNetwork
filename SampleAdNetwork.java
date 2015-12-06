@@ -242,6 +242,9 @@ public class SampleAdNetwork extends Agent {
 		currCampaign = campaignData;
 		genCampaignQueries(currCampaign);
                 
+                midPrice = 0.2*campaignData.budget/((campaignData.dayEnd-campaignData.dayStart)*1.0);
+                maxPrice = midPrice;
+               
                 allCampaign.add(campaignData);
 
 		/*
@@ -265,7 +268,9 @@ public class SampleAdNetwork extends Agent {
 
 		pendingCampaign = new CampaignData(com);
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign opportunity - " + pendingCampaign);
-
+                
+                
+                
                 allCampaign.add(pendingCampaign);
 		/*
 		 * The campaign requires com.getReachImps() impressions. The competing
@@ -283,21 +288,29 @@ public class SampleAdNetwork extends Agent {
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign total budget bid (millis): " + cmpBidMillis);
 
                 
-                getDayOtherCampaign(day);
-                getDayMyCampaign(day);
+                //getDayOtherCampaign(day);
+                //getDayMyCampaign(day);
+                // System.out.println("    [getReachLevel] Day " + day + " ReachLevel: " +getReachLevel(day));
+                // System.out.println("    [getTakeReachLevel] Day " + day + " ReachTakeLevel: " +getTakeReachLevel(day));
+                // System.out.println("    [getUCSDemandlevel] Day " + day + " UCSDemandlevel: "+ getUCSDemandlevel(getReachLevel(day), getTakeReachLevel(day)));
 		/*
 		 * Adjust ucs bid s.t. target level is achieved. Note: The bid for the
 		 * user classification service is piggybacked
 		 */
 
-		if (adNetworkDailyNotification != null) {
-			double ucsLevel = adNetworkDailyNotification.getServiceLevel();
-			ucsBid = 0.1 + random.nextDouble()/10.0;			
-			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": ucs level reported: " + ucsLevel);
-		} else {
-			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Initial ucs bid is " + ucsBid);
-		}
-
+//		if (adNetworkDailyNotification != null) {
+//			double ucsLevel = adNetworkDailyNotification.getServiceLevel();
+//			ucsBid = 0.1 + random.nextDouble()/10.0;			
+//			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": ucs level reported: " + ucsLevel);
+//		} else {
+//			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Initial ucs bid is " + ucsBid);
+//		}
+                
+                
+                
+                ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
+                System.out.println("    [handleICampaignOpportunityMessage] Day " + day + " ucsBid = "+ ucsBid);
+                
 		/* Note: Campaign bid is in millis */
 		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.15*cmpimps));
 		sendMessage(demandAgentAddress, bids);
@@ -339,6 +352,8 @@ public class SampleAdNetwork extends Agent {
 				+ ". UCS Level set to " + notificationMessage.getServiceLevel()
 				+ " at price " + notificationMessage.getPrice()
 				+ " Quality Score is: " + notificationMessage.getQualityScore());
+                
+                setMidPrice(notificationMessage.getPrice(),notificationMessage.getServiceLevel());
 //                if(day>58){
 //                    AdNetBidMessage bids = new AdNetBidMessage(0.1 + new Random().nextDouble()/10.0, pendingCampaign.id, (long)100);
 //                    sendMessage(demandAgentAddress, bids);
@@ -720,7 +735,7 @@ public class SampleAdNetwork extends Agent {
         
         private double getUCSbid(double ucsDemandLevel){
             double _ucsBid = 0.0;
-            
+            System.out.println("        [getUCSbid] Day: "+ day +" ucsDemandLevel = " + ucsDemandLevel);
             if (ucsDemandLevel<0.4){_ucsBid = maxPrice>0.0005?0.0005:maxPrice;}
             if (ucsDemandLevel>=0.4 && ucsDemandLevel<=0.7){_ucsBid = maxPrice>midPrice?midPrice:maxPrice;}
             if (ucsDemandLevel>0.7){_ucsBid = maxPrice;}
@@ -728,12 +743,64 @@ public class SampleAdNetwork extends Agent {
             return _ucsBid;
         }
         
-        private double getUCSDemandlevel(){
-            
-            return 0.0;
+        private double getUCSDemandlevel(Map<Set<MarketSegment>,Double> reachLevel, Map<Set<MarketSegment>,Double> takeLevel){
+            double ucsPrecidion = 0.0;
+            double cs = 0.0;
+            for(Set<MarketSegment> s: reachLevel.keySet()){
+                if(reachLevel.get(s)>0){
+                    ucsPrecidion += (reachLevel.get(s)*MarketSegment.marketSegmentSize(s)/(1-takeLevel.get(s)));
+                    cs += MarketSegment.marketSegmentSize(s);
+                }
+            }
+            if(cs == 0) return 0.0;
+            return ucsPrecidion/cs;
         }
         
     // Judge whether Others have campaign on a subSegment
+        private Map<Set<MarketSegment>,Double> getReachLevel(int _day){
+            Queue<CampaignData> dayMyCampaign = getDayMyCampaign(_day);
+            Map<Set<MarketSegment>,Double> reachLevel = genLevelMap();
+            
+            
+            for(CampaignData d : dayMyCampaign){
+                // System.out.println("        [getReachLevel] d.subTargetSegment = " + d.subTargetSegment );
+                for(Set<MarketSegment> s: d.subTargetSegment){
+                    if(day>0)
+                        reachLevel.put(s, reachLevel.get(s)+d.stats.getTargetedImps()/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart))));
+                    if(day == 0)
+                        reachLevel.put(s, reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart))));
+                }
+            }
+            
+            return reachLevel;
+        }
+        
+        private Map<Set<MarketSegment>,Double> genLevelMap(){
+            Map<Set<MarketSegment>,Double> reachLevel = new HashMap<Set<MarketSegment>,Double>();
+            for(int i=18; i<26; i++){
+                reachLevel.put(MarketSegment.marketSegments().get(i), 0.0);
+            }
+            
+            return reachLevel;  
+        }
+        
+        private Map<Set<MarketSegment>,Double> getTakeReachLevel(int _day){
+            Queue<CampaignData> dayOtherCampaign = getDayOtherCampaign(_day);
+            Map<Set<MarketSegment>,Double> takeLevel = genLevelMap();
+            double takeLevDou = 0.0;
+            for(CampaignData d : dayOtherCampaign){
+                // System.out.println("        [getTakeReachLevel] d.subTargetSegment = " + d.subTargetSegment );
+                for(Set<MarketSegment> s: d.subTargetSegment){
+                    takeLevDou = d.reachImps/((MarketSegment.marketSegmentSize(d.targetSegment))*(d.dayEnd-d.dayStart)*1.0);
+                    // System.out.println("        [getTakeReachLevel] takeLevDou = " + takeLevDou );
+                    takeLevel.put(s, takeLevel.get(s)>takeLevDou?takeLevel.get(s):takeLevDou);
+                }
+            }
+            
+            
+            return takeLevel;
+        }
+
     private boolean haveCompetitor(Set<MarketSegment> seg, int day){
     	if(day <= 5) {
     		System.out.println("[haveCompetitor] (day: " + day + ")" + "(segment:" + seg + ") false : First 5 days, cannot judge.");
