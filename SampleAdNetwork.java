@@ -39,6 +39,7 @@ import tau.tac.adx.report.demand.AdNetBidMessage;
 import tau.tac.adx.report.demand.AdNetworkDailyNotification;
 import tau.tac.adx.report.demand.CampaignOpportunityMessage;
 import tau.tac.adx.report.demand.CampaignReport;
+import tau.tac.adx.report.demand.CampaignReportEntry;
 import tau.tac.adx.report.demand.CampaignReportKey;
 import tau.tac.adx.report.demand.InitialCampaignMessage;
 import tau.tac.adx.report.demand.campaign.auction.CampaignAuctionReport;
@@ -74,7 +75,7 @@ public class SampleAdNetwork extends Agent {
 	 * reports {@link CampaignOpportunityMessage}, {@link CampaignReport}, and
 	 * {@link AdNetworkDailyNotification}.
 	 */
-	private final Queue<CampaignReport> campaignReports;
+	private final Map<Integer, CampaignReport> campaignReports;
 	private final Map<Integer, AdNetworkReport> adNetworkReports;
 	private PublisherCatalog publisherCatalog;
 	private InitialCampaignMessage initialCampaignMessage;
@@ -141,7 +142,7 @@ public class SampleAdNetwork extends Agent {
 	
 
 	public SampleAdNetwork() {
-		campaignReports = new LinkedList<CampaignReport>();
+		campaignReports = new HashMap<Integer, CampaignReport>();
         allCampaign = new LinkedList<CampaignData>();
         adNetworkReports = new HashMap<Integer, AdNetworkReport>();
         notifications = new HashMap<Integer, AdNetworkDailyNotification>();
@@ -346,8 +347,8 @@ public class SampleAdNetwork extends Agent {
 					+ notificationMessage.getCostMillis();
 		}
 		
-		notifications.put(notificationMessage.getEffectiveDay(), notificationMessage);
-
+		notifications.put(day+1, notificationMessage);
+		System.out.println("[PutNotification](day:"+(day+1)+") (EffectDay:" + notificationMessage.getEffectiveDay()+")");
 		System.out.println("[handleAdNetworkDailyNotification] Day " + day + ": " + campaignAllocatedTo
 				+ ". UCS Level set to " + notificationMessage.getServiceLevel()
 				+ " at price " + notificationMessage.getPrice()
@@ -415,7 +416,26 @@ public class SampleAdNetwork extends Agent {
 					double maxBid = 10000 * campaign.budget/campaign.reachImps;
 					// default coef = 1 (text, pc)
 					double coef = 1;
-					// if is mobile or video, add 0.6 of corresponding coef
+					double impsCoef = 1;
+					double ucsCoef = 1;
+					double togoCoef = 1;
+					double impsRatio = this.getImpsTogoDayRatio(day, campaign);
+					if(impsRatio > 1){
+						impsCoef = 3;
+					} else if(impsRatio > 0.8){
+						impsCoef = 2;
+					} else if(impsRatio > 0.6){
+						impsCoef = 1.5;
+					} else if(impsRatio < 0.3) {
+						impsCoef = 0.6;
+					}
+					double ucs = this.getDayUcsLevel(dayBiddingFor);
+					ucsCoef = impsRatio/ucs;
+					
+					double basicBid = maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					
+					
+					// if is mobile or video, add 0.9 of corresponding coef
 					if(query.getDevice() == Device.mobile)
 						coef = 1 + (campaign.mobileCoef-1)*0.9;
 					if(query.getAdType() == AdType.video)
@@ -425,25 +445,25 @@ public class SampleAdNetwork extends Agent {
 					if(query.getMarketSegments().size() ==0){
 						String publisher = query.getPublisher();
 						double ratio = this.getCampaignPopRatio(campaign);
-						bidBundle.addQuery(query, maxBid*coef*0.8*ratio*ratio, new Ad(null),
+						bidBundle.addQuery(query, basicBid*ratio, new Ad(null),
 								campaign.id, 1);
 					}
 					// have competition, bid 0.5*max*coef
 					// ?? leave weight here for future.
 					else if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
-						//if(dayBiddingFor == )
+						double bid = maxBid*coef;
 						
-						bidBundle.addQuery(query, maxBid*coef*0.8, new Ad(null),
+						
+						bidBundle.addQuery(query, basicBid, new Ad(null),
 								campaign.id, 1);
 					} 
 					// no competitor
 					else {
-						double bid = maxBid*coef;
 						if(campaign.impsTogo() > 0)
-							bid *= 0.1;
+							basicBid *= 0.1;
 						else
-							bid *= 0.1;
-						bidBundle.addQuery(query, bid, new Ad(null), campaign.id, 1);
+							basicBid *= 0.1;
+						bidBundle.addQuery(query, basicBid, new Ad(null), campaign.id, 1);
 					}
 				}
 			}
@@ -503,9 +523,9 @@ public class SampleAdNetwork extends Agent {
 	 * Campaigns performance w.r.t. each allocated campaign
 	 */
 	private void handleCampaignReport(CampaignReport campaignReport) {
-
-		campaignReports.add(campaignReport);
-
+		if(campaignReport.size()>0){
+			this.campaignReports.put(day, campaignReport);
+		}
 		/*
 		 * for each campaign, the accumulated statistics from day 1 up to day
 		 * n-1 are reported
@@ -540,7 +560,7 @@ public class SampleAdNetwork extends Agent {
 	 * @param AdNetworkReport
 	 */
 	private void handleAdNetworkReport(AdNetworkReport adnetReport) {
-		this.adNetworkReports.put(day-1, adnetReport);
+		this.adNetworkReports.put(day, adnetReport);
 
 		System.out.println("[handleAdNetworkReport] Day " + day + " : AdNetworkReport");
 		
@@ -874,8 +894,16 @@ public class SampleAdNetwork extends Agent {
     }
     
     private double getDayUcsLevel(int day) {
-    	double ucs = notifications.get(day).getServiceLevel();
-    	System.out.println("[getDayUcsLevel][day:" + day +"]" + ucs);
+    	if(day==0){
+    		return 0.9;
+    	}
+    	if(notifications.get(day) != null){
+    		double ucs = notifications.get(day).getServiceLevel();
+    		System.out.println("[getDayUcsLevel][day:" + day +"]" + ucs);
+    		return ucs;
+    	}
+    	double ucs = 0.6;
+    	System.out.println("[getDayUcsLevel][day:" + day +"] (not found)" + ucs);
     	return ucs;
     }
     
@@ -917,6 +945,28 @@ public class SampleAdNetwork extends Agent {
     		total += getPublisherPop(pubName);
     	}
     	return getPublisherPop(publisher)/total;
+    }
+    
+    private double getImpsTogoDayRatio(int day, CampaignData camp) {
+    	CampaignReport report = campaignReports.get(day);
+    	double all = MarketSegment.marketSegmentSize(camp.targetSegment);
+    	double imps = camp.reachImps;
+    	double dayLeft = camp.dayEnd - day + 1;
+    	if(report != null){
+    	for(CampaignReportKey key : report.keys()){
+    		if(key.getCampaignId() == camp.id){
+    			CampaignReportEntry entry = report.getEntry(key);
+    			double targetedImps = entry.getCampaignStats().getTargetedImps();
+    			System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
+    					+ ") (nowImps" + targetedImps + ") (dayLeft: " + dayLeft + ") (ratio: "+ ((imps-targetedImps)/all)/dayLeft);
+    			return ((imps-targetedImps)/all)/dayLeft;
+    		}
+    	}
+    	}
+    	
+    	System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
+				+ ") (nowImps: 0, 1st or 2nd DAY"+ ") (dayLeft: " + dayLeft + ") (ratio: "+ (imps/all)/dayLeft);
+    	return (imps/all)/dayLeft;
     }
 
 	private class CampaignData {
