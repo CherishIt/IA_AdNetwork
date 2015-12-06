@@ -31,7 +31,9 @@ import tau.tac.adx.props.AdxBidBundle;
 import tau.tac.adx.props.AdxQuery;
 import tau.tac.adx.props.PublisherCatalog;
 import tau.tac.adx.props.PublisherCatalogEntry;
+import tau.tac.adx.report.adn.AdNetworkKey;
 import tau.tac.adx.report.adn.AdNetworkReport;
+import tau.tac.adx.report.adn.AdNetworkReportEntry;
 import tau.tac.adx.report.adn.MarketSegment;
 import tau.tac.adx.report.demand.AdNetBidMessage;
 import tau.tac.adx.report.demand.AdNetworkDailyNotification;
@@ -73,9 +75,12 @@ public class SampleAdNetwork extends Agent {
 	 * {@link AdNetworkDailyNotification}.
 	 */
 	private final Queue<CampaignReport> campaignReports;
+	private final Map<Integer, AdNetworkReport> adNetworkReports;
 	private PublisherCatalog publisherCatalog;
 	private InitialCampaignMessage initialCampaignMessage;
 	private AdNetworkDailyNotification adNetworkDailyNotification;
+	
+	private final Map<Integer, AdNetworkDailyNotification> notifications;
 	
     private final Queue<CampaignData> allCampaign;
     
@@ -137,7 +142,9 @@ public class SampleAdNetwork extends Agent {
 
 	public SampleAdNetwork() {
 		campaignReports = new LinkedList<CampaignReport>();
-                allCampaign = new LinkedList<CampaignData>();
+        allCampaign = new LinkedList<CampaignData>();
+        adNetworkReports = new HashMap<Integer, AdNetworkReport>();
+        notifications = new HashMap<Integer, AdNetworkDailyNotification>();
 	}
 
 	@Override
@@ -292,7 +299,7 @@ public class SampleAdNetwork extends Agent {
 		}
 
 		/* Note: Campaign bid is in millis */
-		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.11*cmpimps));
+		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.15*cmpimps));
 		sendMessage(demandAgentAddress, bids);
 	}
 
@@ -325,6 +332,8 @@ public class SampleAdNetwork extends Agent {
 			campaignAllocatedTo = " WON at cost (Millis)"
 					+ notificationMessage.getCostMillis();
 		}
+		
+		notifications.put(notificationMessage.getEffectiveDay(), notificationMessage);
 
 		System.out.println("[handleAdNetworkDailyNotification] Day " + day + ": " + campaignAllocatedTo
 				+ ". UCS Level set to " + notificationMessage.getServiceLevel()
@@ -388,28 +397,29 @@ public class SampleAdNetwork extends Agent {
 					&& (dayBiddingFor <= campaign.dayEnd)){
 				for(AdxQuery query : campaign.campaignQueries) {
 					// maxBid not exceed budget per imp
-					double maxBid = 1000 * campaign.budget/campaign.reachImps;
+					double maxBid = 10000 * campaign.budget/campaign.reachImps;
 					// default coef = 1 (text, pc)
 					double coef = 1;
 					// if is mobile or video, add 0.6 of corresponding coef
 					if(query.getDevice() == Device.mobile)
-						coef = 1 + (campaign.mobileCoef-1)*0.6;
+						coef = 1 + (campaign.mobileCoef-1)*0.9;
 					if(query.getAdType() == AdType.video)
-						coef = 1 + (campaign.videoCoef-1)*0.6;
+						coef = 1 + (campaign.videoCoef-1)*0.9;
 					// have competition, bid 0.5*max*coef
 					// ?? leave weight here for future.
 					if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
 						//if(dayBiddingFor == )
-						bidBundle.addQuery(query, maxBid*coef*0.5, new Ad(null),
+						
+						bidBundle.addQuery(query, maxBid*coef*0.8, new Ad(null),
 								campaign.id, 1);
 					} 
 					// no competitor
 					else {
 						double bid = maxBid*coef;
 						if(campaign.impsTogo() > 0)
-							bid *= 1;
+							bid *= 0.1;
 						else
-							bid *= 1;
+							bid *= 0.1;
 						bidBundle.addQuery(query, bid, new Ad(null), campaign.id, 1);
 					}
 				}
@@ -507,15 +517,15 @@ public class SampleAdNetwork extends Agent {
 	 * @param AdNetworkReport
 	 */
 	private void handleAdNetworkReport(AdNetworkReport adnetReport) {
+		this.adNetworkReports.put(day-1, adnetReport);
 
 		System.out.println("[handleAdNetworkReport] Day " + day + " : AdNetworkReport");
-		/*
-		 * for (AdNetworkKey adnetKey : adnetReport.keys()) {
-		 * 
-		 * double rnd = Math.random(); if (rnd > 0.95) { AdNetworkReportEntry
-		 * entry = adnetReport .getAdNetworkReportEntry(adnetKey);
-		 * System.out.println(adnetKey + " " + entry); } }
-		 */
+		
+		 for (AdNetworkKey adnetKey : adnetReport.keys()) {	  
+			 double rnd = Math.random(); if (rnd > 0.95) { AdNetworkReportEntry
+			 entry = adnetReport .getAdNetworkReportEntry(adnetKey);
+			 System.out.println(adnetKey + " " + entry); } 
+		 }
 	}
 
 	@Override
@@ -535,10 +545,12 @@ public class SampleAdNetwork extends Agent {
 	@Override
 	protected void simulationFinished() {
 		campaignReports.clear();
-                allCampaign.clear();
+        allCampaign.clear();
+        adNetworkReports.clear();
+        notifications.clear();
 		bidBundle = null;
                 System.out.println("[simulationFinished] Day " + day + " : ----------------------------------------------------");
-                System.exit(-1);
+                //System.exit(-1);
 	}
 
 	/**
@@ -718,6 +730,26 @@ public class SampleAdNetwork extends Agent {
         }
     	System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ")" + "false");
     	return false;
+    }
+    
+    private double getSegmentWinRatio(AdxQuery query, int day){
+    	AdNetworkReport adReport = adNetworkReports.get(day);
+    	
+    	//for(adReport.)
+    	
+    	return 1.0;
+    }
+    
+    private double getDayUcsLevel(int day) {
+    	double ucs = notifications.get(day).getServiceLevel();
+    	System.out.println("[getDayUcsLevel][day:" + day +"]" + ucs);
+    	return ucs;
+    }
+    
+    private double getDayQuality(int day) {
+    	double quality = notifications.get(day).getQualityScore();
+    	System.out.println("[getDayQuality][day:" + day +"]" + quality);
+    	return quality;
     }
 
 	private class CampaignData {
