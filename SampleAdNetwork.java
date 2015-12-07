@@ -469,7 +469,7 @@ public class SampleAdNetwork extends Agent {
 					if(query.getAdType() == AdType.video)
 						coef *= (1 + (campaign.videoCoef-1)*0.9);
 					
-					double basicBid = 10*maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					double basicBid = 40*maxBid*coef*impsCoef*ucsCoef*togoCoef;
 					
 					//is unknown user
 					if(query.getMarketSegments().size() ==0){
