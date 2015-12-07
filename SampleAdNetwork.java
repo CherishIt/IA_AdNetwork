@@ -243,8 +243,8 @@ public class SampleAdNetwork extends Agent {
 		currCampaign = campaignData;
 		genCampaignQueries(currCampaign);
                 
-                midPrice = 0.2*campaignData.budget/((campaignData.dayEnd-campaignData.dayStart)*1.0);
-                maxPrice = midPrice;
+                midPrice = 0.2*campaignData.budget/((campaignData.dayEnd-campaignData.dayStart+1)*1.0);
+                maxPrice = midPrice *1.3;
                 System.out.println("    [handleInitialCampaignMessage] Initial midPrice "+midPrice);
                
                 allCampaign.add(campaignData);
@@ -271,7 +271,8 @@ public class SampleAdNetwork extends Agent {
 		pendingCampaign = new CampaignData(com);
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign opportunity - " + pendingCampaign);
                 
-                
+                ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
+                System.out.println("    [handleICampaignOpportunityMessage] Day " + day + " ucsBid = "+ ucsBid);
                 
                 allCampaign.add(pendingCampaign);
 		/*
@@ -310,8 +311,7 @@ public class SampleAdNetwork extends Agent {
                 
                 
                 
-                ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
-                System.out.println("    [handleICampaignOpportunityMessage] Day " + day + " ucsBid = "+ ucsBid);
+                
                 
 		/* Note: Campaign bid is in millis */
 		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.15*cmpimps));
@@ -598,7 +598,7 @@ public class SampleAdNetwork extends Agent {
         notifications.clear();
 		bidBundle = null;
                 System.out.println("[simulationFinished] Day " + day + " : ----------------------------------------------------");
-                //System.exit(-1);
+                System.exit(-1);
 	}
 
 	/**
@@ -788,21 +788,23 @@ public class SampleAdNetwork extends Agent {
         private Map<Set<MarketSegment>,Double> getReachLevel(int _day){
             Queue<CampaignData> dayMyCampaign = getDayMyCampaign(_day);
             Map<Set<MarketSegment>,Double> reachLevel = genLevelMap();
-            
+            double singleReachlevel = 0.0;
             
             for(CampaignData d : dayMyCampaign){
                 // System.out.println("        [getReachLevel] d.subTargetSegment = " + d.subTargetSegment );
                 for(Set<MarketSegment> s: d.subTargetSegment){
                     if(day>0){
                         if(day>d.dayStart){
-                            reachLevel.put(s, reachLevel.get(s)+d.stats.getTargetedImps()/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-day)));
+                            singleReachlevel = reachLevel.get(s)+((d.reachImps - d.stats.getTargetedImps())>0?
+                                    (d.reachImps - d.stats.getTargetedImps()):0)/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-day+1));
                         }else{
-                            reachLevel.put(s, reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-d.dayStart)));
+                            singleReachlevel = reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-d.dayStart+1));
                         }
                     }
                     else{
-                        reachLevel.put(s, reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart))));
+                        singleReachlevel = reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart)+1));
                     }
+                    reachLevel.put(s, singleReachlevel>1?1:singleReachlevel);
                 }
             }
             
@@ -825,7 +827,7 @@ public class SampleAdNetwork extends Agent {
             for(CampaignData d : dayOtherCampaign){
                 // System.out.println("        [getTakeReachLevel] d.subTargetSegment = " + d.subTargetSegment );
                 for(Set<MarketSegment> s: d.subTargetSegment){
-                    takeLevDou = d.reachImps/((MarketSegment.marketSegmentSize(d.targetSegment))*(d.dayEnd-d.dayStart)*1.0);
+                    takeLevDou = d.reachImps/((MarketSegment.marketSegmentSize(d.targetSegment))*(d.dayEnd-d.dayStart+1)*1.0);
                     // System.out.println("        [getTakeReachLevel] takeLevDou = " + takeLevDou );
                     takeLevel.put(s, takeLevel.get(s)>takeLevDou?takeLevel.get(s):takeLevDou);
                 }
