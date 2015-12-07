@@ -245,6 +245,7 @@ public class SampleAdNetwork extends Agent {
                 
                 midPrice = 0.2*campaignData.budget/((campaignData.dayEnd-campaignData.dayStart)*1.0);
                 maxPrice = midPrice;
+                System.out.println("    [handleInitialCampaignMessage] Initial midPrice "+midPrice);
                
                 allCampaign.add(campaignData);
 
@@ -770,6 +771,9 @@ public class SampleAdNetwork extends Agent {
         private double getUCSDemandlevel(Map<Set<MarketSegment>,Double> reachLevel, Map<Set<MarketSegment>,Double> takeLevel){
             double ucsPrecidion = 0.0;
             double cs = 0.0;
+            System.out.println("        [getUCSDemandlevel] Day: "+ day +" reachLevel = " + reachLevel);
+            System.out.println("        [getUCSDemandlevel] Day: "+ day+ " takeLevel = "+ takeLevel);
+            
             for(Set<MarketSegment> s: reachLevel.keySet()){
                 if(reachLevel.get(s)>0){
                     ucsPrecidion += (reachLevel.get(s)*MarketSegment.marketSegmentSize(s)/(1-takeLevel.get(s)));
@@ -789,10 +793,16 @@ public class SampleAdNetwork extends Agent {
             for(CampaignData d : dayMyCampaign){
                 // System.out.println("        [getReachLevel] d.subTargetSegment = " + d.subTargetSegment );
                 for(Set<MarketSegment> s: d.subTargetSegment){
-                    if(day>0)
-                        reachLevel.put(s, reachLevel.get(s)+d.stats.getTargetedImps()/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart))));
-                    if(day == 0)
+                    if(day>0){
+                        if(day>d.dayStart){
+                            reachLevel.put(s, reachLevel.get(s)+d.stats.getTargetedImps()/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-day)));
+                        }else{
+                            reachLevel.put(s, reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-d.dayStart)));
+                        }
+                    }
+                    else{
                         reachLevel.put(s, reachLevel.get(s)+d.reachImps/(1.0*MarketSegment.marketSegmentSize(d.targetSegment)*(d.dayEnd-(day>d.dayStart?day:d.dayStart))));
+                    }
                 }
             }
             
