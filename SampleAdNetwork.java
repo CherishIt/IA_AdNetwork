@@ -446,7 +446,7 @@ public class SampleAdNetwork extends Agent {
 					} else if(impsRatio > 0.8){
 						impsCoef = 2;
 					} else if(impsRatio > 0.6){
-						impsCoef = 1.2;
+						impsCoef = 1.5;
 					} else if(impsRatio < 0.3) {
 						impsCoef = 0.8;
 					}
@@ -469,14 +469,18 @@ public class SampleAdNetwork extends Agent {
 					if(query.getAdType() == AdType.video)
 						coef *= (1 + (campaign.videoCoef-1)*0.95);
 					
-					double basicBid = 50*maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					double n=80;
+					if(dayBiddingFor < 6)
+						n = 200;
+					
+					double basicBid = n*maxBid*coef*impsCoef*ucsCoef*togoCoef;
 					
 					//is unknown user
 					if(query.getMarketSegments().size() ==0){
 						String publisher = query.getPublisher();
 						double ratio = this.getCampaignPopRatio(campaign);
-						System.out.println("[PopRatio]" + ratio);
-						bidBundle.addQuery(query, basicBid*ratio/2, new Ad(null),
+						//System.out.println("[PopRatio]" + ratio);
+						bidBundle.addQuery(query, (basicBid*ratio)/20, new Ad(null),
 								campaign.id, weight);
 					}
 					// have competition, bid 0.5*max*coef
@@ -490,11 +494,11 @@ public class SampleAdNetwork extends Agent {
 					else {
 						bidBundle.addQuery(query, basicBid*0.1, new Ad(null), campaign.id, weight);
 					}
-					System.out.println("[Bid] seg:"+ query.getMarketSegments() + " basicBid:"+basicBid);
+					//System.out.println("[Bid] seg:"+ query.getMarketSegments() + " basicBid:"+basicBid);
 				}
 			}
 			//set limit
-			bidBundle.setCampaignTotalLimit(campaign.id, (int)(campaign.reachImps*1.5), campaign.budget*1.5);
+			bidBundle.setCampaignTotalLimit(campaign.id, (int)(campaign.reachImps*1.5), campaign.budget*5);
 			
 		}
 		
@@ -1117,14 +1121,10 @@ public class SampleAdNetwork extends Agent {
     	long duration = camp.duration;
     	System.out.println("[compute] reachlevel:"+reachLevel+" duration:" +duration);
     	if(reachLevel == 0.5){
-    		if(duration == 3){
-    			basicBid = 1.1 * impPrice +ucsPrice;
-    		}
     		finalBid = Math.min(max, basicBid);
     	} else if(reachLevel == 0.2){
-    		if(duration != 3){
+
     			basicBid = 0.75 * impPrice + ucsPrice;
-    		}
     		finalBid = Math.min(basicBid, max);
     	} else if(reachLevel == 0.8){
     		if(duration == 5){
