@@ -86,6 +86,7 @@ public class SampleAdNetwork extends Agent {
     private final Queue<CampaignData> allCampaign;
     
     
+    
 	/*
 	 * The addresses of server entities to which the agent should send the daily
 	 * bids data
@@ -309,7 +310,7 @@ public class SampleAdNetwork extends Agent {
 //			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Initial ucs bid is " + ucsBid);
 //		}
                 
-                
+                this.computeBasicBid(pendingCampaign);
                 
                 
                 
@@ -567,7 +568,7 @@ public class SampleAdNetwork extends Agent {
 	private void handleAdNetworkReport(AdNetworkReport adnetReport) {
 		this.adNetworkReports.put(day, adnetReport);
 
-		System.out.println("[handleAdNetworkReport] Day " + day + " : AdNetworkReport");
+		//System.out.println("[handleAdNetworkReport] Day " + day + " : AdNetworkReport");
 		
 		 for (AdNetworkKey adnetKey : adnetReport.keys()) {	  
 			 double rnd = Math.random(); if (rnd > 0.95) { AdNetworkReportEntry
@@ -714,7 +715,7 @@ public class SampleAdNetwork extends Agent {
         private void showAllCampaign(){
             int count = 1;
             for (CampaignData d: allCampaign){
-                System.out.println("    [showAllCampaign] "+"("+count+") "+d);
+                //System.out.println("    [showAllCampaign] "+"("+count+") "+d);
                 count++;
             }
         
@@ -727,7 +728,7 @@ public class SampleAdNetwork extends Agent {
             for (CampaignData d: allCampaign){
                 if(d.dayStart <= _day && d.dayEnd >= _day && myCampaigns.get(d.id) == null){
                     dayOtherCampaign.add(d);
-                    System.out.println("    [getDayOtherCampaign] (day: " + _day +") " + d);
+                    //System.out.println("    [getDayOtherCampaign] (day: " + _day +") " + d);
                 }   
             }
             
@@ -837,9 +838,12 @@ public class SampleAdNetwork extends Agent {
             return takeLevel;
         }
 
+        
+        
+    //start----------------ImpressionAuction----------------
     private boolean haveCompetitor(Set<MarketSegment> seg, int day){
     	if(day <= 5) {
-    		System.out.println("[haveCompetitor] (day: " + day + ")" + "(segment:" + seg + ") false : First 5 days, cannot judge.");
+    		//System.out.println("[haveCompetitor] (day: " + day + ")" + "(segment:" + seg + ") false : First 5 days, cannot judge.");
     		return true;
     	}
     	for (CampaignData d: allCampaign){
@@ -847,11 +851,11 @@ public class SampleAdNetwork extends Agent {
             if((d.dayStart <= day && d.dayEnd >= day) &&
                 (!myCampaigns.containsKey(d.id)) &&
                 (d.subTargetSegment.contains(seg))) {
-            	System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ") true :" + d);
+            	//System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ") true :" + d);
             	return true;
             }   
         }
-    	System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ")" + "false");
+    	//System.out.println("[haveCompetitor] (day: " + day +") " + "(segment:" + seg + ")" + "false");
     	return false;
     }
     
@@ -895,8 +899,8 @@ public class SampleAdNetwork extends Agent {
     			+ MarketSegment.marketSegmentSize(MarketSegment.compundMarketSegment1(MarketSegment.FEMALE));
 
     	double ratio = segPop/allPop;
-    	System.out.println("[getSegmentPopRatio] (totalPop: " + allPop 
-    			+ ") (segPop: " + segPop + ") ( ratio: "+ ratio  );
+    	//System.out.println("[getSegmentPopRatio] (totalPop: " + allPop 
+    	//		+ ") (segPop: " + segPop + ") ( ratio: "+ ratio  );
     	
     	return ratio;
     }
@@ -915,18 +919,24 @@ public class SampleAdNetwork extends Agent {
     	}
     	if(notifications.get(day) != null){
     		double ucs = notifications.get(day).getServiceLevel();
-    		System.out.println("[getDayUcsLevel][day:" + day +"]" + ucs);
+    		//System.out.println("[getDayUcsLevel][day:" + day +"]" + ucs);
     		return ucs;
     	}
     	double ucs = 0.6;
-    	System.out.println("[getDayUcsLevel][day:" + day +"] (not found)" + ucs);
+    	//System.out.println("[getDayUcsLevel][day:" + day +"] (not found)" + ucs);
     	return ucs;
     }
     
     private double getDayQuality(int day) {
-    	double quality = notifications.get(day).getQualityScore();
-    	System.out.println("[getDayQuality][day:" + day +"]" + quality);
-    	return quality;
+    	if(notifications.get(day) != null){
+    		double quality = notifications.get(day).getQualityScore();
+    		System.out.println("[getDayQuality][day:" + day +"]" + quality);
+    		return quality;
+    	}else{
+    		double quality = 1.0;
+    		System.out.println("[getDayQuality][day:" + day +"](NOT FOUND)" + quality);
+    		return quality;
+    	}
     }
   
     private static Double getPublisherPop(String publisher){
@@ -976,23 +986,88 @@ public class SampleAdNetwork extends Agent {
     		if(key.getCampaignId() == camp.id){
     			CampaignReportEntry entry = report.getEntry(key);
     			double targetedImps = entry.getCampaignStats().getTargetedImps();
-    			System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
-    					+ ") (nowImps" + targetedImps + ") (dayLeft: " + dayLeft + ") (ratio: "+ ((imps-targetedImps)/all)/dayLeft);
+    	//		System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
+    	//				+ ") (nowImps" + targetedImps + ") (dayLeft: " + dayLeft + ") (ratio: "+ ((imps-targetedImps)/all)/dayLeft);
     			return ((imps-targetedImps)/all)/dayLeft;
     		}
     	}
     	}
     	
-    	System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
-				+ ") (nowImps: 0, 1st or 2nd DAY"+ ") (dayLeft: " + dayLeft + ") (ratio: "+ (imps/all)/dayLeft);
+    	//System.out.println("[getImpsTogeDayRatio] "+ "(day:" + day + ") (reachImps:"+imps 
+		//		+ ") (nowImps: 0, 1st or 2nd DAY"+ ") (dayLeft: " + dayLeft + ") (ratio: "+ (imps/all)/dayLeft);
     	return (imps/all)/dayLeft;
     }
+    //end---------------------ImpressionAuction------------------
+    
+    //start-------------------CampaignAuction--------------------
+    private double computeCostPerImp(){
+    	double allImpsNum = 0;
+    	double allImpsCost = 0;
+    	for(CampaignData camp : myCampaigns.values()){
+    		allImpsNum += camp.stats.getTargetedImps();
+    		allImpsCost += camp.stats.getCost();
+    	}
+    	if(allImpsNum!=0 && allImpsCost!=0){
+    		System.out.println("[computeCostPerImp] (day:"+day+") (allNum:" + allImpsNum
+    				+ ") (allCost:"+allImpsCost+") (CostPerImp:"+allImpsCost/allImpsNum + ")");
+    		return allImpsCost/allImpsNum;
+    	} else {
+    		System.out.println("[computeCostPerImp] (day:"+day+") (allNum:" + allImpsNum
+    				+ ") (allCost:"+allImpsCost+") (CostPerImp:"+0.001 + ")");
+    		return 0.001;
+    	}
+    }
+    
+    private double computeImpCost(CampaignData camp){
+    	double cost = camp.reachImps*computeCostPerImp();
+    	System.out.println("[computeImpCost] (day:"+day+") (CampId:" + camp.id
+				+ ") (Cost:"+cost+")");
+    	return cost;
+    }
+    
+    private double computeUcsPrice(CampaignData camp){
+    	double ucsPrice = this.midPrice * camp.duration * camp.getReachLevel() / 0.5;
+    	System.out.println("[computeUcsPrice] (CampId:" + camp.id
+				+ ") (ucsPrice:"+ucsPrice+")");
+    	return ucsPrice;
+    }
+    
+    private double getMaxBid(CampaignData camp){
+    	double quality = this.getDayQuality(day);
+    	double bid = camp.reachImps * 0.001 * quality - 0.0001;
+    	System.out.println("[getMaxBid] (day:"+day+") (CampId:" + camp.id
+				+ ") (MaxBid:"+bid+")");
+    	return bid;
+    }
+    
+    private double getMinBid(CampaignData camp){
+    	double quality = this.getDayQuality(day);
+    	double bid = camp.reachImps * 0.0001 * quality - 0.0001;
+    	System.out.println("[getMinBid] (day:"+day+") (CampId:" + camp.id
+				+ ") (MinBid:"+bid+")");
+    	return bid;
+    }
+    
+    private double computeBasicBid(CampaignData camp){
+    	double impPrice = this.computeImpCost(camp);
+    	double ucsPrice = this.computeUcsPrice(camp);
+    	double basicBid = impPrice + ucsPrice;
+    	System.out.println("[computeBasicBid] (CampId:" + camp.id
+				+"(Reach: "+camp.reachImps+ ") (Seg:"+camp.targetSegment+") (BasicBid:"+basicBid+")"
+				+ "(MaxBid:"+this.getMaxBid(camp)+") (MinBid:" + this.getMinBid(camp)+")");
+    	return basicBid;
+    }
+    
+    //end---------------------CampaignAuction--------------------
 
 	private class CampaignData {
 		/* campaign attributes as set by server */
 		Long reachImps;
 		long dayStart;
 		long dayEnd;
+		
+		long duration;
+		
 		Set<MarketSegment> targetSegment;
 		List<Set<MarketSegment>> subTargetSegment = new ArrayList<Set<MarketSegment>>();
 		double videoCoef;
@@ -1012,7 +1087,7 @@ public class SampleAdNetwork extends Agent {
 			videoCoef = icm.getVideoCoef();
 			mobileCoef = icm.getMobileCoef();
 			id = icm.getId();
-			
+			duration = dayEnd - dayStart + 1;
 			
 			// if seg is 1 or 2, get all 3 subSeg
 			this.addSubTargetSeg(targetSegment);
@@ -1122,6 +1197,8 @@ public class SampleAdNetwork extends Agent {
 			stats = new CampaignStats(0, 0, 0);
 			budget = 0.0;
 			
+			duration = dayEnd - dayStart + 1;
+			
 			// if seg is 1 or 2, get all 3 subSeg
 			this.addSubTargetSeg(targetSegment);
 		}
@@ -1148,6 +1225,16 @@ public class SampleAdNetwork extends Agent {
 		public void setCampaignQueries(AdxQuery[] campaignQueries) {
 			this.campaignQueries = campaignQueries;
 		}
+		
+		public double getReachLevel(){
+			double all = MarketSegment.marketSegmentSize(targetSegment);
+			double reachPerDay = reachImps/duration;
+			double reachLevel = reachPerDay/all;
+			System.out.println("[getReachLevel] (CampId:" + id
+					+ ") (ReachLevel:"+reachLevel+")");
+			return reachLevel;
+		}
+		
 
 	}
 
