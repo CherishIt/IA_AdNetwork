@@ -469,7 +469,7 @@ public class SampleAdNetwork extends Agent {
 					if(query.getAdType() == AdType.video)
 						coef *= (1 + (campaign.videoCoef-1)*0.9);
 					
-					double basicBid = 40*maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					double basicBid = 50*maxBid*coef*impsCoef*ucsCoef*togoCoef;
 					
 					//is unknown user
 					if(query.getMarketSegments().size() ==0){
@@ -494,7 +494,7 @@ public class SampleAdNetwork extends Agent {
 				}
 			}
 			//set limit
-			bidBundle.setCampaignTotalLimit(campaign.id, (int)(campaign.reachImps*1.5), campaign.budget*5);
+			bidBundle.setCampaignTotalLimit(campaign.id, (int)(campaign.reachImps*1.5), campaign.budget*1.5);
 			
 		}
 		
@@ -625,7 +625,7 @@ public class SampleAdNetwork extends Agent {
         notifications.clear();
 		bidBundle = null;
                 System.out.println("[simulationFinished] Day " + day + " : ----------------------------------------------------");
-                System.exit(-1);
+               // System.exit(-1);
 	}
 
 	/**
@@ -1124,9 +1124,9 @@ public class SampleAdNetwork extends Agent {
     	} else if(reachLevel == 0.8){
     		if(duration == 5){
     			basicBid = 1.2 * impPrice + ucsPrice;
-    			finalBid = Math.max(basicBid, max);
+    			finalBid = Math.min(basicBid, max);
     		}else{
-    			finalBid = 2*max;
+    			finalBid = max;
     		}
     	}
     	
