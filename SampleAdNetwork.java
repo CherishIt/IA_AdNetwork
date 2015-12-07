@@ -430,9 +430,13 @@ public class SampleAdNetwork extends Agent {
 						impsCoef = 0.6;
 					}
 					double ucs = this.getDayUcsLevel(dayBiddingFor);
-					ucsCoef = impsRatio/ucs;
+					ucsCoef = (impsRatio+0.2)/ucs;
 					
 					double basicBid = maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					
+					// weight set to impressionToGo ratio.
+					// more need, more weight.
+					int weight = (int)((impsRatio+0.2)*100);
 					
 					
 					// if is mobile or video, add 0.9 of corresponding coef
@@ -446,7 +450,7 @@ public class SampleAdNetwork extends Agent {
 						String publisher = query.getPublisher();
 						double ratio = this.getCampaignPopRatio(campaign);
 						bidBundle.addQuery(query, basicBid*ratio, new Ad(null),
-								campaign.id, 1);
+								campaign.id, weight);
 					}
 					// have competition, bid 0.5*max*coef
 					// ?? leave weight here for future.
@@ -455,7 +459,7 @@ public class SampleAdNetwork extends Agent {
 						
 						
 						bidBundle.addQuery(query, basicBid, new Ad(null),
-								campaign.id, 1);
+								campaign.id, weight);
 					} 
 					// no competitor
 					else {
@@ -463,7 +467,7 @@ public class SampleAdNetwork extends Agent {
 							basicBid *= 0.1;
 						else
 							basicBid *= 0.1;
-						bidBundle.addQuery(query, basicBid, new Ad(null), campaign.id, 1);
+						bidBundle.addQuery(query, basicBid, new Ad(null), campaign.id, weight);
 					}
 				}
 			}
@@ -952,6 +956,9 @@ public class SampleAdNetwork extends Agent {
     	double all = MarketSegment.marketSegmentSize(camp.targetSegment);
     	double imps = camp.reachImps;
     	double dayLeft = camp.dayEnd - day + 1;
+    	if(camp.dayStart == day+1){
+    		dayLeft--;
+    	}
     	if(report != null){
     	for(CampaignReportKey key : report.keys()){
     		if(key.getCampaignId() == camp.id){
