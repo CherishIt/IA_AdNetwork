@@ -246,7 +246,7 @@ public class SampleAdNetwork extends Agent {
                 
                 midPrice = 0.2*campaignData.budget/((campaignData.dayEnd-campaignData.dayStart+1)*1.0);
                 maxPrice = midPrice *1.3;
-                System.out.println("    [handleInitialCampaignMessage] Initial midPrice "+midPrice);
+                System.out.println("    [handleInitialCampaignMessage] Initial midPrice "+midPrice +" campaignData.budget "+campaignData.budget);
                
                 allCampaign.add(campaignData);
 
@@ -547,6 +547,7 @@ public class SampleAdNetwork extends Agent {
 					+ cstats.getOtherImps() + " nonTgtImps. Cost of imps is "
 					+ cstats.getCost());
 		}
+                
 	}
 
 	/**
