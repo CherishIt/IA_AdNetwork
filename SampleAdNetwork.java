@@ -448,7 +448,7 @@ public class SampleAdNetwork extends Agent {
 					} else if(impsRatio > 0.6){
 						impsCoef = 1.2;
 					} else if(impsRatio < 0.3) {
-						impsCoef = 0.6;
+						impsCoef = 0.8;
 					}
 					double ucs = this.getDayUcsLevel(dayBiddingFor);
 					ucsCoef = 1/ucs/2;
@@ -465,9 +465,9 @@ public class SampleAdNetwork extends Agent {
 					
 					// if is mobile or video, add 0.9 of corresponding coef
 					if(query.getDevice() == Device.mobile)
-						coef *= (1 + (campaign.mobileCoef-1)*0.9);
+						coef *= (1 + (campaign.mobileCoef-1)*0.95);
 					if(query.getAdType() == AdType.video)
-						coef *= (1 + (campaign.videoCoef-1)*0.9);
+						coef *= (1 + (campaign.videoCoef-1)*0.95);
 					
 					double basicBid = 50*maxBid*coef*impsCoef*ucsCoef*togoCoef;
 					
@@ -1117,9 +1117,14 @@ public class SampleAdNetwork extends Agent {
     	long duration = camp.duration;
     	System.out.println("[compute] reachlevel:"+reachLevel+" duration:" +duration);
     	if(reachLevel == 0.5){
+    		if(duration == 3){
+    			basicBid = 1.1 * impPrice +ucsPrice;
+    		}
     		finalBid = Math.min(max, basicBid);
     	} else if(reachLevel == 0.2){
-    		basicBid = 0.75 * impPrice + ucsPrice;
+    		if(duration != 3){
+    			basicBid = 0.75 * impPrice + ucsPrice;
+    		}
     		finalBid = Math.min(basicBid, max);
     	} else if(reachLevel == 0.8){
     		if(duration == 5){
