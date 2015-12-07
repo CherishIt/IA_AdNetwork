@@ -288,6 +288,7 @@ public class SampleAdNetwork extends Agent {
                 }
                 System.out.println("    [handleICampaignOpportunityMessage] Day " + day + " ucsBid = "+ ucsBid);
                 
+                double bid = 1000*this.computeCampaignBid(pendingCampaign);
                 allCampaign.add(pendingCampaign);
 		/*
 		 * The campaign requires com.getReachImps() impressions. The competing
@@ -323,13 +324,13 @@ public class SampleAdNetwork extends Agent {
 //			System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Initial ucs bid is " + ucsBid);
 //		}
                 
-                this.computeBasicBid(pendingCampaign);
                 
                 
-                myCampaignsBid.put(pendingCampaign.id,(long)(0.15*cmpimps));
+                
+                myCampaignsBid.put(pendingCampaign.id,(long)(bid));
                 System.out.println("    [handleICampaignOpportunityMessage] Day " + day + ": Campaign bid is " + (0.15*cmpimps));
 		/* Note: Campaign bid is in millis */
-		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.15*cmpimps));
+		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id,(long)(bid) /*(long)(0.15*cmpimps)*/);
 		sendMessage(demandAgentAddress, bids);
 	}
 
@@ -445,52 +446,56 @@ public class SampleAdNetwork extends Agent {
 					} else if(impsRatio > 0.8){
 						impsCoef = 2;
 					} else if(impsRatio > 0.6){
-						impsCoef = 1.5;
+						impsCoef = 1.2;
 					} else if(impsRatio < 0.3) {
 						impsCoef = 0.6;
 					}
 					double ucs = this.getDayUcsLevel(dayBiddingFor);
-					ucsCoef = (impsRatio+0.2)/ucs;
-					
-					double basicBid = maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					ucsCoef = 1/ucs/2;
 					
 					// weight set to impressionToGo ratio.
 					// more need, more weight.
-					int weight = (int)((impsRatio+0.2)*100);
-					
+					//int weight = (int)((impsRatio+0.2)*100);
+					int weight = 10;
+					/*if(campaign.impsTogo()==0 && this.numMyCampOnSeg(query.getMarketSegments(), dayBiddingFor)>0)
+						weight = 1;*/
+					if(campaign.impsTogo() == 0){
+						weight = 2;
+					}
 					
 					// if is mobile or video, add 0.9 of corresponding coef
 					if(query.getDevice() == Device.mobile)
-						coef = 1 + (campaign.mobileCoef-1)*0.9;
+						coef *= (1 + (campaign.mobileCoef-1)*0.9);
 					if(query.getAdType() == AdType.video)
-						coef = 1 + (campaign.videoCoef-1)*0.9;
+						coef *= (1 + (campaign.videoCoef-1)*0.9);
+					
+					double basicBid = 10*maxBid*coef*impsCoef*ucsCoef*togoCoef;
 					
 					//is unknown user
 					if(query.getMarketSegments().size() ==0){
 						String publisher = query.getPublisher();
 						double ratio = this.getCampaignPopRatio(campaign);
-						bidBundle.addQuery(query, basicBid*ratio, new Ad(null),
+						System.out.println("[PopRatio]" + ratio);
+						bidBundle.addQuery(query, basicBid*ratio/2, new Ad(null),
 								campaign.id, weight);
 					}
 					// have competition, bid 0.5*max*coef
 					// ?? leave weight here for future.
 					else if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
-						double bid = maxBid*coef;
-						
 						
 						bidBundle.addQuery(query, basicBid, new Ad(null),
 								campaign.id, weight);
 					} 
 					// no competitor
 					else {
-						if(campaign.impsTogo() > 0)
-							basicBid *= 0.1;
-						else
-							basicBid *= 0.1;
-						bidBundle.addQuery(query, basicBid, new Ad(null), campaign.id, weight);
+						bidBundle.addQuery(query, basicBid*0.1, new Ad(null), campaign.id, weight);
 					}
+					System.out.println("[Bid] seg:"+ query.getMarketSegments() + " basicBid:"+basicBid);
 				}
 			}
+			//set limit
+			bidBundle.setCampaignTotalLimit(campaign.id, (int)(campaign.reachImps*1.5), campaign.budget*5);
+			
 		}
 		
 		if (bidBundle != null) {
@@ -593,7 +598,8 @@ public class SampleAdNetwork extends Agent {
 		 for (AdNetworkKey adnetKey : adnetReport.keys()) {	  
 			 double rnd = Math.random(); if (rnd > 0.95) { AdNetworkReportEntry
 			 entry = adnetReport .getAdNetworkReportEntry(adnetKey);
-			 System.out.println(adnetKey + " " + entry); } 
+			 //System.out.println(adnetKey + " " + entry); 
+			 } 
 		 }
 	}
 
@@ -700,6 +706,7 @@ public class SampleAdNetwork extends Agent {
 	 */
 	private void genCampaignQueries(CampaignData campaignData) {
 		Set<AdxQuery> campaignQueriesSet = new HashSet<AdxQuery>();
+		
 		for (String PublisherName : publisherNames) {
 			for (Set<MarketSegment> subSegment : campaignData.subTargetSegment){
 				campaignQueriesSet.add(new AdxQuery(PublisherName,
@@ -710,18 +717,27 @@ public class SampleAdNetwork extends Agent {
 					subSegment, Device.pc, AdType.text));
 				campaignQueriesSet.add(new AdxQuery(PublisherName,
 					subSegment, Device.pc, AdType.video));
-				//add unknown segment
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						new HashSet<MarketSegment>(), Device.mobile,
-						AdType.video));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						new HashSet<MarketSegment>(), Device.mobile,
-						AdType.text));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						new HashSet<MarketSegment>(), Device.pc, AdType.video));
-				campaignQueriesSet.add(new AdxQuery(PublisherName,
-						new HashSet<MarketSegment>(), Device.pc, AdType.text));
 			}
+			//add unknown segment
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					new HashSet<MarketSegment>(), Device.mobile,
+					AdType.video));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					new HashSet<MarketSegment>(), Device.mobile,
+					AdType.text));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					new HashSet<MarketSegment>(), Device.pc, AdType.video));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					new HashSet<MarketSegment>(), Device.pc, AdType.text));
+			/*test
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					campaignData.targetSegment, Device.mobile, AdType.text));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					campaignData.targetSegment, Device.mobile, AdType.video));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					campaignData.targetSegment, Device.pc, AdType.text));
+			campaignQueriesSet.add(new AdxQuery(PublisherName,
+					campaignData.targetSegment, Device.pc, AdType.video));*/
 			
 		}
 
@@ -901,29 +917,38 @@ public class SampleAdNetwork extends Agent {
 	            num++;
 	        }
     	}
-    	System.out.println("[numMyCampaign] (day: " + day +") " + "(segment:" + seg + "):" + num);
+    	//System.out.println("[numMyCampaign] (day: " + day +") " + "(segment:" + seg + "):" + num);
         return num;
     }
     
     // Get competitionRatio for a Campaign (weighted average of all subSegs)
-    private double competitionRatio(CampaignData camp, int day) {
-    	double ratio = 1;
+    private double getCompetitionRatio(CampaignData camp, int day) {
     	double total = MarketSegment.marketSegmentSize(camp.targetSegment);
     	double competeTotal = 0;
     	for(Set<MarketSegment> subseg : camp.subTargetSegment){
-    		int subTotal = MarketSegment.marketSegmentSize(subseg);
+    		double subTotal = MarketSegment.marketSegmentSize(subseg);
     		// other competitor -> competitor
     		if(haveCompetitor(subseg, day)){
-    			competeTotal += subTotal;
+    			competeTotal += subTotal/2;
     		} else {
-    			int numMy = numMyCampOnSeg(subseg, day);
+    			double numMy = numMyCampOnSeg(subseg, day);
+    			System.out.println("[MyCampOnSeg]"+numMy);
     			// my other camp -> not fully compete.
     			if(numMy > 0){
-    				competeTotal += subTotal - subTotal/numMy;
+    				competeTotal += (subTotal * (double)(numMy-1)/(double)numMy);
     			}
     		}
     	}
     	return competeTotal/total;
+    }
+    
+    private double getCompeteRatioDuration(CampaignData camp){
+    	double compete = 0;
+    	for(long i = camp.dayStart; i<=camp.dayEnd;i++){
+    		compete += this.getCompetitionRatio(camp, (int)i);
+    		System.out.println("[DayCompete]:(day:"+(int)i+")"+this.getCompetitionRatio(camp, (int)i));
+    	}
+    	return compete/(double)camp.duration;
     }
     
     private double getSegmentPopRatio(Set<MarketSegment> seg){
@@ -933,7 +958,7 @@ public class SampleAdNetwork extends Agent {
 
     	double ratio = segPop/allPop;
     	//System.out.println("[getSegmentPopRatio] (totalPop: " + allPop 
-    	//		+ ") (segPop: " + segPop + ") ( ratio: "+ ratio  );
+    		//	+ ") (segPop: " + segPop + ") ( ratio: "+ ratio  );
     	
     	return ratio;
     }
@@ -1081,15 +1106,38 @@ public class SampleAdNetwork extends Agent {
     	return bid;
     }
     
-    private double computeBasicBid(CampaignData camp){
+    private double computeCampaignBid(CampaignData camp){
     	double impPrice = this.computeImpCost(camp);
     	double ucsPrice = this.computeUcsPrice(camp);
     	double basicBid = impPrice + ucsPrice;
-    	System.out.println("[computeBasicBid] (CampId:" + camp.id
-				+"(Reach: "+camp.reachImps+ ") (Seg:"+camp.targetSegment+") (BasicBid:"+basicBid+")"
-				+ "(MaxBid:"+this.getMaxBid(camp)+") (MinBid:" + this.getMinBid(camp)+")");
-    	return basicBid;
+    	double finalBid = basicBid;
+    	double min = this.getMinBid(camp);
+    	double max = this.getMaxBid(camp);
+    	double reachLevel = camp.getReachLevel();
+    	long duration = camp.duration;
+    	System.out.println("[compute] reachlevel:"+reachLevel+" duration:" +duration);
+    	if(reachLevel == 0.5){
+    		finalBid = Math.min(max, basicBid);
+    	} else if(reachLevel == 0.2){
+    		basicBid = 0.75 * impPrice + ucsPrice;
+    		finalBid = Math.min(basicBid, max);
+    	} else if(reachLevel == 0.8){
+    		if(duration == 5){
+    			basicBid = 1.2 * impPrice + ucsPrice;
+    			finalBid = Math.max(basicBid, max);
+    		}else{
+    			finalBid = 2*max;
+    		}
+    	}
+    	
+    	
+    	/*System.out.println("[computeBasicBid] (CampId:" + camp.id
+				+") (ReachLevel: "+camp.getReachLevel()+ ") (Seg:"+camp.targetSegment+") (BasicBid:"+basicBid+")"
+				+ "(MaxBid:"+this.getMaxBid(camp)+") (MinBid:" + this.getMinBid(camp)+") (\nFirstDayCompeteRatio:"+this.getCompetitionRatio(camp, day)
+				+") (\nAverageCompeteRatio:"+this.getCompeteRatioDuration(camp)+")");*/
+    	return Math.max(min, finalBid);
     }
+    
     
     //end---------------------CampaignAuction--------------------
 
@@ -1265,7 +1313,7 @@ public class SampleAdNetwork extends Agent {
 			double reachLevel = reachPerDay/all;
 			System.out.println("[getReachLevel] (CampId:" + id
 					+ ") (ReachLevel:"+reachLevel+")");
-			return reachLevel;
+			return reachLevel>0.7 ? 0.8 : reachLevel > 0.4 ? 0.5 : 0.2;
 		}
 		
 
