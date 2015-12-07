@@ -110,6 +110,7 @@ public class SampleAdNetwork extends Agent {
 	 * by our agent.
 	 */
 	private Map<Integer, CampaignData> myCampaigns;
+        private Map<Integer, Long> myCampaignsBid;
 
 	/*
 	 * the bidBundle to be sent daily to the AdX
@@ -126,6 +127,7 @@ public class SampleAdNetwork extends Agent {
 	 */
 	double ucsTargetLevel;
 
+        private boolean haveCampaignOppotunityl;
 	/*
 	 * current day of simulation
 	 */
@@ -144,9 +146,10 @@ public class SampleAdNetwork extends Agent {
 
 	public SampleAdNetwork() {
 		campaignReports = new HashMap<Integer, CampaignReport>();
-        allCampaign = new LinkedList<CampaignData>();
-        adNetworkReports = new HashMap<Integer, AdNetworkReport>();
-        notifications = new HashMap<Integer, AdNetworkDailyNotification>();
+                allCampaign = new LinkedList<CampaignData>();
+                adNetworkReports = new HashMap<Integer, AdNetworkReport>();
+                notifications = new HashMap<Integer, AdNetworkDailyNotification>();
+                myCampaignsBid = new HashMap<Integer, Long>();
 	}
 
 	@Override
@@ -197,6 +200,12 @@ public class SampleAdNetwork extends Agent {
 
 	private void handleBankStatus(BankStatus content) {
 		System.out.println("[handleBankStatus] Day " + day + " :" + content.toString());
+                if(haveCampaignOppotunityl == false){
+                    System.out.println("    [handleBankStatus] Day " + day + " : bid for ucs without campaign oppotunity");
+                    ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
+                    AdNetBidMessage bids = new AdNetBidMessage(ucsBid, 0, (long)0);
+                    sendMessage(demandAgentAddress, bids);
+                }
 	}
 
 	/**
@@ -268,11 +277,15 @@ public class SampleAdNetwork extends Agent {
 			CampaignOpportunityMessage com) {
 
 		day = com.getDay();
-
+                haveCampaignOppotunityl = true;
 		pendingCampaign = new CampaignData(com);
 		System.out.println("[handleICampaignOpportunityMessage] Day " + day + ": Campaign opportunity - " + pendingCampaign);
                 
-                ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
+                if(day == 0){
+                    ucsBid = getUCSbid(1.0);
+                }else{
+                    ucsBid = getUCSbid(getUCSDemandlevel(getReachLevel(day+2), getTakeReachLevel(day+2)));
+                }
                 System.out.println("    [handleICampaignOpportunityMessage] Day " + day + " ucsBid = "+ ucsBid);
                 
                 allCampaign.add(pendingCampaign);
@@ -313,7 +326,8 @@ public class SampleAdNetwork extends Agent {
                 this.computeBasicBid(pendingCampaign);
                 
                 
-                
+                myCampaignsBid.put(pendingCampaign.id,(long)(0.15*cmpimps));
+                System.out.println("    [handleICampaignOpportunityMessage] Day " + day + ": Campaign bid is " + (0.15*cmpimps));
 		/* Note: Campaign bid is in millis */
 		AdNetBidMessage bids = new AdNetBidMessage(ucsBid, pendingCampaign.id, (long)(0.15*cmpimps));
 		sendMessage(demandAgentAddress, bids);
@@ -357,6 +371,9 @@ public class SampleAdNetwork extends Agent {
 				+ " Quality Score is: " + notificationMessage.getQualityScore());
                 
                 setMidPrice(notificationMessage.getPrice(),notificationMessage.getServiceLevel());
+                double avr = setMaxPrice()+midPrice;
+                maxPrice = avr>(midPrice*2)?avr:(midPrice*2);
+                System.out.println("    [setMaxPrice] Day: "+ day +" MaxPrice = " + maxPrice);
 //                if(day>58){
 //                    AdNetBidMessage bids = new AdNetBidMessage(0.1 + new Random().nextDouble()/10.0, pendingCampaign.id, (long)100);
 //                    sendMessage(demandAgentAddress, bids);
@@ -371,6 +388,7 @@ public class SampleAdNetwork extends Agent {
 	private void handleSimulationStatus(SimulationStatus simulationStatus) {
 		System.out.println("[handleSimulationStatus] Day " + day + " : Simulation Status Received");
 		sendBidAndAds();
+                haveCampaignOppotunityl = false;
 		System.out.println("[handleSimulationStatus] Day " + day + " ended. Starting next day");
 		++day;
 	}
@@ -548,6 +566,7 @@ public class SampleAdNetwork extends Agent {
 					+ cstats.getCost());
 		}
                 
+                
 	}
 
 	/**
@@ -583,7 +602,7 @@ public class SampleAdNetwork extends Agent {
 
 		day = 0;
 		bidBundle = new AdxBidBundle();
-
+                haveCampaignOppotunityl = false;
 		/* initial bid between 0.1 and 0.2 */
 		ucsBid = 0.2;
 
@@ -758,6 +777,19 @@ public class SampleAdNetwork extends Agent {
             if(midPrice == ucsPrice && ucsLevel ==1){midPrice = midPrice*0.5;}
             System.out.println("    [setMidPrice] Day: "+ day +" MidPrice = " + midPrice);
          
+        }
+        
+        private double setMaxPrice(){
+            
+            double averImpCost = 0.0;
+            Queue<CampaignData> dayMyCampaign = getDayMyCampaign(day);
+            for(CampaignData d : dayMyCampaign){
+                
+                averImpCost += (d.budget-myCampaignsBid.get(d.id))/((d.dayEnd-d.dayStart+1)*1.0);
+                
+            }
+
+            return averImpCost/2;   
         }
         
         private double getUCSbid(double ucsDemandLevel){
