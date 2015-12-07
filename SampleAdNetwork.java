@@ -800,7 +800,7 @@ public class SampleAdNetwork extends Agent {
             double averImpCost = 0.0;
             Queue<CampaignData> dayMyCampaign = getDayMyCampaign(day);
             for(CampaignData d : dayMyCampaign){
-                
+                if(myCampaignsBid.get(d.id) == null) continue;
                 averImpCost += (d.budget-myCampaignsBid.get(d.id))/((d.dayEnd-d.dayStart+1)*1.0);
                 
             }
