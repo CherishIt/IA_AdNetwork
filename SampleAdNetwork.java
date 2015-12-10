@@ -434,13 +434,14 @@ public class SampleAdNetwork extends Agent {
 					&& (dayBiddingFor <= campaign.dayEnd)){
 				for(AdxQuery query : campaign.campaignQueries) {
 					// maxBid not exceed budget per imp
-					double maxBid = 10000 * campaign.budget/campaign.reachImps;
+					double maxBid = 1000000 * campaign.budget/campaign.reachImps;
 					// default coef = 1 (text, pc)
 					double coef = 1;
 					double impsCoef = 1;
 					double ucsCoef = 1;
-					double togoCoef = 1;
 					double impsRatio = this.getImpsTogoDayRatio(day, campaign);
+					
+					//more impression to do ratio, bid more.
 					if(impsRatio > 1){
 						impsCoef = 3;
 					} else if(impsRatio > 0.8){
@@ -451,50 +452,52 @@ public class SampleAdNetwork extends Agent {
 						impsCoef = 0.8;
 					}
 					double ucs = this.getDayUcsLevel(dayBiddingFor);
-					ucsCoef = 1/ucs/2;
+					// higher ucs level, lower bid.
+					ucsCoef = 0.6/ucs;
 					
 					// weight set to impressionToGo ratio.
 					// more need, more weight.
-					//int weight = (int)((impsRatio+0.2)*100);
-					int weight = 10;
-					/*if(campaign.impsTogo()==0 && this.numMyCampOnSeg(query.getMarketSegments(), dayBiddingFor)>0)
+					/*int weight = (int)((impsRatio+0.2)*100);
+					if(campaign.impsTogo()==0 && this.numMyCampOnSeg(query.getMarketSegments(), dayBiddingFor)>0)
 						weight = 1;*/
+					
+					int weight = 10;
+					// if reach imps, lower weight
 					if(campaign.impsTogo() == 0){
 						weight = 2;
 					}
 					
-					// if is mobile or video, add 0.9 of corresponding coef
+					// if is mobile or video, add 1.2 of corresponding coef
 					if(query.getDevice() == Device.mobile)
-						coef *= (1 + (campaign.mobileCoef-1)*0.95);
+						coef *= (1 + (campaign.mobileCoef-1)*1.2);
 					if(query.getAdType() == AdType.video)
-						coef *= (1 + (campaign.videoCoef-1)*0.95);
+						coef *= (1 + (campaign.videoCoef-1)*1.2);
 					
-					double n=80;
+					double n=0.8;
 					if(dayBiddingFor < 6)
-						n = 200;
+						n = 2.0;
 					
-					double basicBid = n*maxBid*coef*impsCoef*ucsCoef*togoCoef;
+					double basicBid = n*maxBid*coef*impsCoef*ucsCoef;
 					
 					//is unknown user
 					if(query.getMarketSegments().size() ==0){
 						String publisher = query.getPublisher();
 						double ratio = this.getCampaignPopRatio(campaign);
 						//System.out.println("[PopRatio]" + ratio);
-						bidBundle.addQuery(query, (basicBid*ratio)/20, new Ad(null),
+						bidBundle.addQuery(query, (basicBid*ratio)/2, new Ad(null),
 								campaign.id, weight);
 					}
-					// have competition, bid 0.5*max*coef
-					// ?? leave weight here for future.
+					// have competition, bid 
 					else if(haveCompetitor(query.getMarketSegments(), dayBiddingFor)) {
 						
 						bidBundle.addQuery(query, basicBid, new Ad(null),
 								campaign.id, weight);
 					} 
-					// no competitor
+					// no competitor, 0.1 * bid
 					else {
-						bidBundle.addQuery(query, basicBid*0.1, new Ad(null), campaign.id, weight);
+						bidBundle.addQuery(query, basicBid*0.5, new Ad(null), campaign.id, weight);
 					}
-					//System.out.println("[Bid] seg:"+ query.getMarketSegments() + " basicBid:"+basicBid);
+					System.out.println("[Bid] seg:"+ query.getMarketSegments() + " basicBid:"+basicBid);
 				}
 			}
 			//set limit
